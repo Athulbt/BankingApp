@@ -203,12 +203,12 @@ const Accounts = () => {
       {loadError && <Alert>{loadError}</Alert>}
       {notice && <Alert tone="success">{notice}</Alert>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <StatCard label="Total balance" value={formatCurrency(total)} icon="bank" iconClass="bg-brand-50 text-brand-600" />
         <StatCard
           label="Open accounts"
           value={accounts.filter((a) => a.isActive).length}
-          hint={`${accounts.length} in total`}
+          hint={accounts.some((a) => !a.isActive) ? `${accounts.length} in total` : undefined}
           icon="card"
           iconClass="bg-slate-100 text-slate-600"
         />

@@ -115,7 +115,7 @@ const Transactions = () => {
 
       {loadError && <Alert>{loadError}</Alert>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <StatCard label="Money in" value={formatCurrency(moneyIn)} icon="arrowDownLeft" iconClass="bg-emerald-50 text-emerald-600" />
         <StatCard label="Money out" value={formatCurrency(moneyOut)} icon="arrowUpRight" iconClass="bg-rose-50 text-rose-600" />
         <StatCard

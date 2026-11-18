@@ -62,14 +62,19 @@ export const IconChip = ({ icon, className = 'bg-brand-50 text-brand-600', size 
   </span>
 );
 
+// Compact on phones (three fit in a row), roomier with an icon from the sm breakpoint
 export const StatCard = ({ label, value, hint, icon, iconClass }) => (
-  <div className="card flex items-start justify-between gap-4 p-5">
+  <div className="card flex min-w-0 items-start justify-between gap-4 p-3 sm:p-5">
     <div className="min-w-0">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{value}</p>
+      <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
+      <p className="mt-1 truncate text-base font-semibold tracking-tight text-slate-900 tabular-nums sm:mt-2 sm:text-2xl">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
-    {icon && <IconChip icon={icon} className={iconClass} />}
+    {icon && (
+      <span className="hidden sm:block">
+        <IconChip icon={icon} className={iconClass} />
+      </span>
+    )}
   </div>
 );
 
