@@ -13,7 +13,7 @@ const UserSchema = new mongoose.Schema({
     required: [true, 'Email is required'],
     unique: true,
     lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'Please enter a valid email']
   },
   password: {
     type: String,
@@ -39,6 +39,10 @@ const UserSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account'
   }],
+  preferences: {
+    currency: { type: String, default: 'USD' },
+    notifications: { type: Boolean, default: true }
+  },
   rewardsBalance: {
     type: Number,
     default: 0

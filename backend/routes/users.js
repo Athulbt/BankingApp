@@ -132,8 +132,8 @@ router.put('/preferences', auth, async (req, res) => {
     const { currency, notifications } = req.body;
     const updateFields = {};
     
-    if (currency) updateFields.currency = currency;
-    if (notifications !== undefined) updateFields.notifications = notifications;
+    if (currency) updateFields['preferences.currency'] = currency;
+    if (notifications !== undefined) updateFields['preferences.notifications'] = Boolean(notifications);
 
     const user = await User.findByIdAndUpdate(
       req.user.id,

@@ -83,6 +83,11 @@ router.post('/register', [
       }
     });
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        message: Object.values(error.errors).map(e => e.message).join(', ')
+      });
+    }
     console.error('Registration error:', error);
     res.status(500).json({ 
       message: 'Server error during registration' 

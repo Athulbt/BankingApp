@@ -1,169 +1,91 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../contexts/AuthContext';
+import Icon from '../components/Icon';
+import TransactionItem, { describeTransaction } from '../components/TransactionItem';
+import { Alert, EmptyState, IconChip, PageHeader, PageLoader, Spinner, StatCard, StatusBadge } from '../components/ui';
+import { accountInfo, formatCurrency, formatDate, maskAccount, TRANSACTION_TYPES } from '../utils/format';
+
+const DAY = 24 * 60 * 60 * 1000;
+const DATE_RANGES = { '7days': 7, '30days': 30, '90days': 90, all: null };
+
+const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 const Transactions = () => {
-  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const accountFilter = searchParams.get('account') || 'all';
+
+  const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [filteredTransactions, setFilteredTransactions] = useState([]);
+  const [firstLoad, setFirstLoad] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    type: 'all',
-    category: 'all',
-    dateRange: '30days'
-  });
+  const [loadError, setLoadError] = useState('');
+  const [type, setType] = useState('all');
+  const [dateRange, setDateRange] = useState('30days');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchTransactions();
+    axios.get('/api/accounts').then((res) => setAccounts(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
-    filterTransactions();
-  }, [transactions, filters, searchTerm]);
+    const load = async () => {
+      setLoading(true);
+      setLoadError('');
+      try {
+        const params = { limit: 100 };
+        if (accountFilter !== 'all') params.accountId = accountFilter;
+        const res = await axios.get('/api/transactions', { params });
+        setTransactions(res.data.transactions || []);
+      } catch (err) {
+        console.error('Error fetching transactions:', err);
+        setLoadError('We couldn’t load your transactions. Please refresh the page.');
+      } finally {
+        setLoading(false);
+        setFirstLoad(false);
+      }
+    };
+    load();
+  }, [accountFilter]);
 
-  const fetchTransactions = async () => {
-    try {
-      const res = await axios.get('/api/transactions');
-      setTransactions(res.data.transactions || []);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      // Mock data
-      setTransactions([
-        {
-          _id: '1',
-          description: 'Salary Deposit',
-          amount: 2500.00,
-          type: 'deposit',
-          category: 'income',
-          status: 'completed',
-          createdAt: '2024-01-15T10:30:00Z',
-          fromAccount: { accountNumber: '4582761890', type: 'checking' }
-        },
-        {
-          _id: '2',
-          description: 'Grocery Store',
-          amount: -85.43,
-          type: 'payment',
-          category: 'food',
-          status: 'completed',
-          createdAt: '2024-01-14T16:45:00Z',
-          fromAccount: { accountNumber: '4582761890', type: 'checking' }
-        },
-        {
-          _id: '3',
-          description: 'Electric Bill',
-          amount: -120.75,
-          type: 'payment',
-          category: 'bills',
-          status: 'completed',
-          createdAt: '2024-01-12T09:15:00Z',
-          fromAccount: { accountNumber: '4582761890', type: 'checking' }
-        },
-        {
-          _id: '4',
-          description: 'Transfer to Savings',
-          amount: -500.00,
-          type: 'transfer',
-          category: 'savings',
-          status: 'completed',
-          createdAt: '2024-01-10T14:20:00Z',
-          fromAccount: { accountNumber: '4582761890', type: 'checking' },
-          toAccount: { accountNumber: '7391852341', type: 'savings' }
-        },
-        {
-          _id: '5',
-          description: 'Online Shopping',
-          amount: -45.99,
-          type: 'payment',
-          category: 'shopping',
-          status: 'completed',
-          createdAt: '2024-01-08T11:30:00Z',
-          fromAccount: { accountNumber: '4582761890', type: 'checking' }
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterTransactions = () => {
-    let filtered = [...transactions];
-
-    // Filter by type
-    if (filters.type !== 'all') {
-      filtered = filtered.filter(t => t.type === filters.type);
-    }
-
-    // Filter by category
-    if (filters.category !== 'all') {
-      filtered = filtered.filter(t => t.category === filters.category);
-    }
-
-    // Filter by date range
-    const now = new Date();
-    if (filters.dateRange === '7days') {
-      const weekAgo = new Date(now.setDate(now.getDate() - 7));
-      filtered = filtered.filter(t => new Date(t.createdAt) >= weekAgo);
-    } else if (filters.dateRange === '30days') {
-      const monthAgo = new Date(now.setDate(now.getDate() - 30));
-      filtered = filtered.filter(t => new Date(t.createdAt) >= monthAgo);
-    } else if (filters.dateRange === '90days') {
-      const threeMonthsAgo = new Date(now.setDate(now.getDate() - 90));
-      filtered = filtered.filter(t => new Date(t.createdAt) >= threeMonthsAgo);
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(t =>
-        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (t.fromAccount?.accountNumber && t.fromAccount.accountNumber.includes(searchTerm)) ||
-        (t.toAccount?.accountNumber && t.toAccount.accountNumber.includes(searchTerm))
+  const filtered = useMemo(() => {
+    const days = DATE_RANGES[dateRange];
+    const since = days ? Date.now() - days * DAY : 0;
+    const q = searchTerm.trim().toLowerCase();
+    return transactions.filter((t) => {
+      if (type !== 'all' && t.type !== type) return false;
+      if (new Date(t.createdAt).getTime() < since) return false;
+      if (!q) return true;
+      return (
+        t.description?.toLowerCase().includes(q) ||
+        t.recipient?.name?.toLowerCase().includes(q) ||
+        t.fromAccount?.accountNumber?.includes(q) ||
+        t.toAccount?.accountNumber?.includes(q)
       );
-    }
+    });
+  }, [transactions, type, dateRange, searchTerm]);
 
-    setFilteredTransactions(filtered);
-  };
+  const net = (t) => t.netAmount ?? 0;
+  const moneyIn = filtered.filter((t) => net(t) > 0).reduce((s, t) => s + net(t), 0);
+  const moneyOut = Math.abs(filtered.filter((t) => net(t) < 0).reduce((s, t) => s + net(t), 0));
+  const netChange = moneyIn - moneyOut;
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      food: '🍔',
-      shopping: '🛍️',
-      bills: '📄',
-      entertainment: '🎬',
-      transport: '🚗',
-      healthcare: '🏥',
-      income: '💰',
-      savings: '🏦',
-      other: '📊'
-    };
-    return icons[category] || '📊';
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      completed: 'text-green-600 bg-green-100',
-      pending: 'text-yellow-600 bg-yellow-100',
-      failed: 'text-red-600 bg-red-100',
-      cancelled: 'text-gray-600 bg-gray-100'
-    };
-    return colors[status] || 'text-gray-600 bg-gray-100';
-  };
-
-  const exportTransactions = () => {
-    const csvContent = [
-      ['Date', 'Description', 'Amount', 'Type', 'Category', 'Status'],
-      ...filteredTransactions.map(t => [
-        new Date(t.createdAt).toLocaleDateString(),
+  const exportCsv = () => {
+    const rows = [
+      ['Date', 'Description', 'Type', 'Status', 'Amount', 'Fee', 'Net effect', 'From', 'To'],
+      ...filtered.map((t) => [
+        new Date(t.createdAt).toISOString(),
         t.description,
+        TRANSACTION_TYPES[t.type] || t.type,
+        t.status,
         t.amount,
-        t.type,
-        t.category,
-        t.status
+        t.fee || 0,
+        net(t),
+        t.fromAccount?.accountNumber || '',
+        t.toAccount?.accountNumber || t.recipient?.name || ''
       ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    ];
+    const blob = new Blob([rows.map((r) => r.map(csvCell).join(',')).join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -172,183 +94,142 @@ const Transactions = () => {
     URL.revokeObjectURL(url);
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="loading-spinner"></div>
-      </div>
-    );
-  }
+  const setAccountFilter = (value) => {
+    setSearchParams(value === 'all' ? {} : { account: value });
+  };
+
+  if (firstLoad) return <PageLoader />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Transaction History</h1>
-          <p className="text-gray-600">View and manage your transactions</p>
-        </div>
-        <button onClick={exportTransactions} className="btn-secondary">
-          Export CSV
-        </button>
+    <div className="space-y-8">
+      <PageHeader
+        title="Transactions"
+        description="Search, filter and export your account activity."
+        actions={
+          <button type="button" onClick={exportCsv} disabled={filtered.length === 0} className="btn-secondary">
+            <Icon name="download" className="h-4 w-4" />
+            Export CSV
+          </button>
+        }
+      />
+
+      {loadError && <Alert>{loadError}</Alert>}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Money in" value={formatCurrency(moneyIn)} icon="arrowDownLeft" iconClass="bg-emerald-50 text-emerald-600" />
+        <StatCard label="Money out" value={formatCurrency(moneyOut)} icon="arrowUpRight" iconClass="bg-rose-50 text-rose-600" />
+        <StatCard
+          label="Net change"
+          value={`${netChange > 0 ? '+' : netChange < 0 ? '−' : ''}${formatCurrency(Math.abs(netChange))}`}
+          icon="chart"
+          iconClass="bg-brand-50 text-brand-600"
+        />
       </div>
 
-      {/* Filters */}
       <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {/* Search */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search
-            </label>
+        {/* Filters */}
+        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="relative sm:col-span-2 lg:col-span-1">
+            <label htmlFor="search" className="sr-only">Search</label>
+            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
-              type="text"
+              id="search"
+              type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-field"
-              placeholder="Search transactions..."
+              className="input-field pl-9"
+              placeholder="Search transactions"
             />
           </div>
-
-          {/* Type Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type
-            </label>
-            <select
-              value={filters.type}
-              onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-              className="input-field"
-            >
-              <option value="all">All Types</option>
-              <option value="transfer">Transfer</option>
-              <option value="deposit">Deposit</option>
-              <option value="withdrawal">Withdrawal</option>
-              <option value="payment">Payment</option>
+            <label htmlFor="account" className="sr-only">Account</label>
+            <select id="account" value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="input-field">
+              <option value="all">All accounts</option>
+              {accounts.map((a) => (
+                <option key={a._id} value={a._id}>{accountInfo(a.type).label} {maskAccount(a.accountNumber)}</option>
+              ))}
             </select>
           </div>
-
-          {/* Category Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select
-              value={filters.category}
-              onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-              className="input-field"
-            >
-              <option value="all">All Categories</option>
-              <option value="food">Food</option>
-              <option value="shopping">Shopping</option>
-              <option value="bills">Bills</option>
-              <option value="entertainment">Entertainment</option>
-              <option value="transport">Transport</option>
-              <option value="healthcare">Healthcare</option>
-              <option value="income">Income</option>
-              <option value="savings">Savings</option>
+            <label htmlFor="type" className="sr-only">Type</label>
+            <select id="type" value={type} onChange={(e) => setType(e.target.value)} className="input-field">
+              <option value="all">All types</option>
+              {Object.entries(TRANSACTION_TYPES).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
           </div>
-
-          {/* Date Range Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date Range
-            </label>
-            <select
-              value={filters.dateRange}
-              onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value }))}
-              className="input-field"
-            >
-              <option value="7days">Last 7 Days</option>
-              <option value="30days">Last 30 Days</option>
-              <option value="90days">Last 90 Days</option>
-              <option value="all">All Time</option>
+            <label htmlFor="range" className="sr-only">Date range</label>
+            <select id="range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="input-field">
+              <option value="7days">Last 7 days</option>
+              <option value="30days">Last 30 days</option>
+              <option value="90days">Last 90 days</option>
+              <option value="all">All time</option>
             </select>
           </div>
         </div>
-      </div>
 
-      {/* Transactions Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card text-center">
-          <p className="text-sm text-gray-600">Total Transactions</p>
-          <p className="text-2xl font-bold text-gray-900">{filteredTransactions.length}</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-sm text-gray-600">Total Income</p>
-          <p className="text-2xl font-bold text-green-600">
-            ${filteredTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
-          </p>
-        </div>
-        <div className="card text-center">
-          <p className="text-sm text-gray-600">Total Expenses</p>
-          <p className="text-2xl font-bold text-red-600">
-            ${Math.abs(filteredTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
-          </p>
-        </div>
-        <div className="card text-center">
-          <p className="text-sm text-gray-600">Net Flow</p>
-          <p className={`text-2xl font-bold ${
-            filteredTransactions.reduce((sum, t) => sum + t.amount, 0) >= 0 ? 'text-green-600' : 'text-red-600'
-          }`}>
-            ${filteredTransactions.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
-          </p>
-        </div>
-      </div>
-
-      {/* Transactions List */}
-      <div className="card">
-        {filteredTransactions.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No transactions found matching your filters.</p>
-          </div>
+        {loading ? (
+          <div className="flex justify-center py-16"><Spinner /></div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No transactions found"
+            description={transactions.length ? 'Try changing your filters or search.' : 'When you send or receive money, it will show up here.'}
+          />
         ) : (
-          <div className="space-y-4">
-            {filteredTransactions.map((transaction) => (
-              <div
-                key={transaction._id}
-                className="flex items-center justify-between py-4 border-b border-gray-200 last:border-0"
-              >
-                {/* Transaction Icon and Description */}
-                <div className="flex items-center space-x-4 flex-1">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
-                    {getCategoryIcon(transaction.category)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{transaction.description}</p>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <span>{new Date(transaction.createdAt).toLocaleDateString()}</span>
-                      <span>•</span>
-                      <span className="capitalize">{transaction.type}</span>
-                      {transaction.fromAccount && (
-                        <>
-                          <span>•</span>
-                          <span>From: ****{transaction.fromAccount.accountNumber?.slice(-4)}</span>
-                        </>
-                      )}
-                      {transaction.toAccount && (
-                        <>
-                          <span>•</span>
-                          <span>To: ****{transaction.toAccount.accountNumber?.slice(-4)}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
+          <>
+            {/* Table (tablet and up) */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50/80">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Description</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map((t) => {
+                    const d = describeTransaction(t);
+                    return (
+                      <tr key={t._id} className="transition hover:bg-slate-50/70">
+                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{formatDate(t.createdAt)}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <IconChip icon={d.icon} className={d.iconClass} size="h-9 w-9" />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-slate-900">{t.description}</p>
+                              <p className="truncate text-xs text-slate-500">
+                                {d.typeLabel}{d.counterparty && ` · ${d.counterparty}`}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"><StatusBadge status={t.status} /></td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right">
+                          <p className={`text-sm font-semibold tabular-nums ${d.amountClass}`}>{d.amountText}</p>
+                          {t.fee > 0 && d.direction === 'out' && (
+                            <p className="text-xs text-slate-400">incl. {formatCurrency(t.fee)} fee</p>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                {/* Amount and Status */}
-                <div className="text-right">
-                  <p className={transaction.amount >= 0 ? 'transaction-income' : 'transaction-expense'}>
-                    {transaction.amount >= 0 ? '+' : ''}${Math.abs(transaction.amount).toFixed(2)}
-                  </p>
-                  <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(transaction.status)}`}>
-                    {transaction.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+            {/* List (phones) */}
+            <ul className="divide-y divide-slate-100 px-4 md:hidden">
+              {filtered.map((t) => <TransactionItem key={t._id} transaction={t} />)}
+            </ul>
+
+            <p className="border-t border-slate-100 px-6 py-3 text-xs text-slate-500">
+              Showing {filtered.length} of {transactions.length} transactions
+            </p>
+          </>
         )}
       </div>
     </div>

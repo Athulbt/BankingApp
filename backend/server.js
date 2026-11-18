@@ -3,13 +3,13 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 
-// Import routes - only the ones we've created
+// Import routes
 import authRoutes from './routes/auth.js';
 import transactionRoutes from './routes/transactions.js';
 import accountRoutes from './routes/accounts.js';
-// Remove users import for now since we're creating it
-// import userRoutes from './routes/users.js';
+import userRoutes from './routes/users.js';
 
 dotenv.config();
 
@@ -17,14 +17,26 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+// Only allow the frontend's origin (set CLIENT_URL in .env for production)
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000' }));
+app.use(express.json({ limit: '10kb' }));
 
-// Routes - only include what we have
+// Slow down password guessing: 10 login/register attempts per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many attempts, please try again later' }
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/accounts', accountRoutes);
-// app.use('/api/users', userRoutes); // Comment out for now
+app.use('/api/users', userRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

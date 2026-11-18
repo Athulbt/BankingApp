@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import AuthLayout from '../components/AuthLayout';
+import { Alert } from '../components/ui';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -11,116 +13,75 @@ const Register = () => {
     dateOfBirth: ''
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
+    setError('');
+
     try {
       await register(formData);
       navigate('/dashboard');
-    } catch (error) {
-      alert('Registration failed. Please try again.');
+    } catch (err) {
+      const data = err.response?.data;
+      setError(
+        data?.errors?.map((x) => x.msg).join('. ') ||
+        data?.message ||
+        'We couldn’t create your account. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto">
-      <div className="card">
-        <h2 className="text-2xl font-bold text-center mb-6">Create Account</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="input-field"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="input-field"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="input-field"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="input-field"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date of Birth
-            </label>
-            <input
-              type="date"
-              name="dateOfBirth"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              className="input-field"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary w-full"
-          >
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-        <p className="text-center mt-4">
+    <AuthLayout
+      title="Open your account"
+      subtitle="It takes about a minute. Your checking account is ready as soon as you finish."
+      footer={
+        <>
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-600 hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </div>
+          <Link to="/login" className="link">Sign in</Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <Alert>{error}</Alert>}
+        <div>
+          <label htmlFor="name" className="form-label">Full name</label>
+          <input id="name" type="text" name="name" autoComplete="name" value={formData.name} onChange={handleChange} className="input-field" required />
+        </div>
+        <div>
+          <label htmlFor="email" className="form-label">Email address</label>
+          <input id="email" type="email" name="email" autoComplete="email" value={formData.email} onChange={handleChange} className="input-field" placeholder="you@example.com" required />
+        </div>
+        <div>
+          <label htmlFor="password" className="form-label">Password</label>
+          <input id="password" type="password" name="password" autoComplete="new-password" minLength={6} value={formData.password} onChange={handleChange} className="input-field" required />
+          <p className="form-hint">At least 6 characters.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div>
+            <label htmlFor="phone" className="form-label">Phone</label>
+            <input id="phone" type="tel" name="phone" autoComplete="tel" value={formData.phone} onChange={handleChange} className="input-field" required />
+          </div>
+          <div>
+            <label htmlFor="dateOfBirth" className="form-label">Date of birth</label>
+            <input id="dateOfBirth" type="date" name="dateOfBirth" autoComplete="bday" value={formData.dateOfBirth} onChange={handleChange} className="input-field" required />
+          </div>
+        </div>
+        <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+          {loading ? 'Creating your account…' : 'Create account'}
+        </button>
+      </form>
+    </AuthLayout>
   );
 };
 

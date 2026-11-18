@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 
 const AccountSchema = new mongoose.Schema({
@@ -42,29 +43,12 @@ const AccountSchema = new mongoose.Schema({
   }
 });
 
-// Generate account number before saving - FIXED VERSION
-AccountSchema.pre('save', function(next) {
-  console.log('Pre-save hook running for Account');
-  console.log('Current accountNumber:', this.accountNumber);
-  
-  if (!this.accountNumber) {
-    // Generate a unique account number
-    const timestamp = Date.now().toString();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    this.accountNumber = 'BA' + timestamp.slice(-8) + random;
-    console.log('Generated account number:', this.accountNumber);
-  }
-  next();
-});
-
-// Also add pre-validate hook to ensure it runs before validation
+// Generate a random account number before validation.
+// crypto.randomInt is unpredictable, and 10 random digits make collisions
+// very unlikely (the unique index still guards against them).
 AccountSchema.pre('validate', function(next) {
-  console.log('Pre-validate hook running');
   if (!this.accountNumber) {
-    const timestamp = Date.now().toString();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    this.accountNumber = 'BA' + timestamp.slice(-8) + random;
-    console.log('Generated account number in pre-validate:', this.accountNumber);
+    this.accountNumber = 'BA' + crypto.randomInt(0, 1e10).toString().padStart(10, '0');
   }
   next();
 });

@@ -23,24 +23,36 @@ A full-stack banking application built with the MERN stack (MongoDB, Express.js,
 
 ## 🚀 Installation & Setup
 
-### 1.Clone and Setup Backend
+### 1. Clone the repository
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd banking-app
+git clone https://github.com/Athulbt/BankingApp.git
+cd BankingApp
+```
 
-# Setup backend
+### 2. Set up the backend
+
+```bash
 cd backend
 npm install
-```bash
+cp .env.example .env
 ```
-### 2. Clone and Setup Frontend
+
+Then open `backend/.env` and fill in:
+
+- `MONGODB_URI` – your MongoDB connection string (local or Atlas)
+- `JWT_SECRET` – a long random string. Generate one with:
+  `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
+
+Never commit `.env`. It is already listed in `.gitignore`.
+
+### 3. Set up the frontend
+
 ```bash
-# Setup frontend
-cd frontend
+cd ../frontend
 npm install
 ```
+
 # Running the Application
 
 ## Method 1: Run in Separate Terminals

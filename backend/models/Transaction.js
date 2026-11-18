@@ -50,7 +50,8 @@ const TransactionSchema = new mongoose.Schema({
     name: String,
     accountNumber: String,
     bankName: String,
-    country: String
+    country: String,
+    currency: String
   },
   createdAt: {
     type: Date,
