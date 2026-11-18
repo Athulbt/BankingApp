@@ -2,6 +2,28 @@
 
 A full-stack banking application built with the MERN stack (MongoDB, Express.js, React, Node.js) that provides modern digital banking features.
 
+## 📸 Screenshots
+
+![Dashboard showing total balance, money in and out, accounts and recent activity](docs/screenshots/dashboard.png)
+
+| Accounts | Send money |
+|---|---|
+| ![Accounts page with checking and savings account cards](docs/screenshots/accounts.png) | ![Send money page with a domestic transfer and fee summary](docs/screenshots/send-money.png) |
+| **Transactions** | **Landing page** |
+| ![Transactions page with filters, totals and history table](docs/screenshots/transactions.png) | ![Landing page with hero section](docs/screenshots/landing.png) |
+
+**On mobile**
+
+<p>
+  <img src="docs/screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="250" />
+  &nbsp;
+  <img src="docs/screenshots/mobile-transactions.png" alt="Transactions on a phone" width="250" />
+  &nbsp;
+  <img src="docs/screenshots/mobile-menu.png" alt="Navigation menu on a phone" width="250" />
+</p>
+
+<sub>Screenshots use demo data for fictional users.</sub>
+
 ## 🚀 Features
 
 - **User Authentication** - Secure registration and login with JWT
